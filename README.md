@@ -6,9 +6,8 @@ Safe one-click cleaner plugin for DankMaterialShell.
 
 - One-click cleanup for safe user-space junk categories
 - Reclaimable space estimation before cleanup
-- Large file discovery view with configurable threshold
-- Disk analyzer tab with top-directory bars and category split
-- Optional per-file delete action in large-file results
+- **Docker tab:** Detect Docker, show storage usage (`docker system df`), one-click prune: stopped containers, unused images, volumes, build cache; full system prune with optional `-a` / `--volumes` and time filter (e.g. `until=24h`) via settings
+- **Disk analyzer tab:** Home total vs configured paths total, last analyzed time, top-directory bars and category pie chart; drill-down (click a directory to view its contents, Back to go up)
 
 ## Safe Mode Scope
 
