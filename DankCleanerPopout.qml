@@ -5,7 +5,7 @@ import qs.Widgets
 
 Column {
     id: root
-    spacing: Theme.spacingM
+    spacing: Theme.spacingS
 
     function maxDiskRowSize() {
         var rows = CleanerService.diskTopDirs || [];
@@ -28,12 +28,12 @@ Column {
 
     DankTabBar {
         id: tabBar
-        width: parent.width - Theme.spacingM * 2
+        width: parent.width - Theme.spacingS * 2
         anchors.horizontalCenter: parent.horizontalCenter
         currentIndex: 0
         model: [
             { text: "Cleanup", icon: "cleaning_services" },
-            { text: "Large Files", icon: "folder_open" },
+            { text: "Docker", icon: "storage" },
             { text: "Disk Analyzer", icon: "pie_chart" }
         ]
         onTabClicked: function(index) { tabBar.currentIndex = index; }
@@ -42,32 +42,32 @@ Column {
     Item {
         visible: tabBar.currentIndex === 0
         width: parent.width
-        height: parent.height - tabBar.height - Theme.spacingM * 2
+        height: parent.height - tabBar.height - Theme.spacingS * 2
 
         Column {
             anchors.fill: parent
-            anchors.margins: Theme.spacingM
-            spacing: Theme.spacingM
+            anchors.margins: Theme.spacingS
+            spacing: Theme.spacingS
 
             Rectangle {
                 width: parent.width
-                height: 72
+                height: 52
                 radius: Theme.cornerRadius
                 color: Theme.surfaceContainerHigh
 
                 Row {
                     anchors.fill: parent
-                    anchors.margins: Theme.spacingM
-                    spacing: Theme.spacingM
+                    anchors.margins: Theme.spacingS
+                    spacing: Theme.spacingS
 
                     Column {
-                        width: parent.width - cleanButton.width - Theme.spacingM
+                        width: parent.width - cleanButton.width - Theme.spacingS
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 4
 
                         StyledText {
                             text: "Reclaimable space: " + CleanerService.formatBytes(CleanerService.totalCleanupBytes)
-                            font.pixelSize: Theme.fontSizeMedium
+                            font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.DemiBold
                             color: Theme.surfaceText
                             width: parent.width
@@ -97,8 +97,8 @@ Column {
             GridLayout {
                 width: parent.width
                 columns: 2
-                columnSpacing: Theme.spacingM
-                rowSpacing: Theme.spacingM
+                columnSpacing: Theme.spacingS
+                rowSpacing: Theme.spacingS
 
                 Repeater {
                     model: [
@@ -127,13 +127,13 @@ Column {
                     Rectangle {
                         required property var modelData
                         Layout.fillWidth: true
-                        height: 84
+                        height: 62
                         radius: Theme.cornerRadius
                         color: Theme.surfaceContainerHigh
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: Theme.spacingM
+                            anchors.margins: Theme.spacingS
                             spacing: Theme.spacingXS
 
                             StyledText {
@@ -144,7 +144,7 @@ Column {
 
                             StyledText {
                                 text: CleanerService.formatBytes(modelData.value)
-                                font.pixelSize: Theme.fontSizeLarge
+                                font.pixelSize: Theme.fontSizeMedium
                                 font.weight: Font.Bold
                                 color: modelData.enabled ? Theme.primary : Theme.surfaceVariantText
                             }
@@ -173,141 +173,10 @@ Column {
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Safe mode: only user-space cache/temp/trash paths are touched."
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: Theme.fontSizeXSmall
                     color: Theme.surfaceVariantText
-                    width: parent.width - 140
+                    width: parent.width - 120
                     elide: Text.ElideRight
-                }
-            }
-        }
-    }
-
-    Item {
-        visible: tabBar.currentIndex === 1
-        width: parent.width
-        height: parent.height - tabBar.height - Theme.spacingM * 2
-
-        Column {
-            anchors.fill: parent
-            anchors.margins: Theme.spacingM
-            spacing: Theme.spacingS
-
-            Row {
-                width: parent.width
-                spacing: Theme.spacingM
-
-                StyledText {
-                    text: "Large files (" + CleanerService.largeFiles.length + ")"
-                    font.pixelSize: Theme.fontSizeMedium
-                    font.weight: Font.DemiBold
-                    color: Theme.surfaceText
-                }
-
-                StyledText {
-                    text: "Threshold: " + CleanerService.largeFileThresholdMb + " MB"
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceVariantText
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.surfaceVariant
-            }
-
-            Flickable {
-                width: parent.width
-                height: parent.height - 34
-                clip: true
-                contentHeight: filesColumn.implicitHeight
-
-                Column {
-                    id: filesColumn
-                    width: parent.width
-                    spacing: 4
-
-                    Repeater {
-                        model: CleanerService.largeFiles
-
-                        Rectangle {
-                            required property var modelData
-                            required property int index
-                            width: filesColumn.width
-                            height: 62
-                            radius: 6
-                            color: index % 2 === 0 ? "transparent" : Qt.rgba(Theme.surfaceVariant.r, Theme.surfaceVariant.g, Theme.surfaceVariant.b, 0.25)
-
-                            Row {
-                                anchors.fill: parent
-                                anchors.leftMargin: Theme.spacingS
-                                anchors.rightMargin: Theme.spacingS
-                                spacing: Theme.spacingM
-
-                                Column {
-                                    width: Math.max(
-                                        120,
-                                        parent.width
-                                        - sizeText.width
-                                        - deleteButton.width
-                                        - Theme.spacingM * 2
-                                    )
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    spacing: 2
-
-                                    StyledText {
-                                        text: modelData.path
-                                        color: Theme.surfaceText
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        elide: Text.ElideMiddle
-                                        width: parent.width
-                                    }
-
-                                    StyledText {
-                                        text: "Modified: " + new Date(modelData.mtime * 1000).toLocaleString()
-                                        color: Theme.surfaceVariantText
-                                        font.pixelSize: Theme.fontSizeXSmall
-                                        width: parent.width
-                                        elide: Text.ElideRight
-                                    }
-                                }
-
-                                StyledText {
-                                    id: sizeText
-                                    text: CleanerService.formatBytes(modelData.size)
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    color: Theme.primary
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    width: 70
-                                    horizontalAlignment: Text.AlignRight
-                                }
-
-                                DankButton {
-                                    id: deleteButton
-                                    text: "Delete"
-                                    iconName: "delete"
-                                    width: 92
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    enabled: !CleanerService.running
-                                    onClicked: CleanerService.removeLargeFile(modelData.path)
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        visible: CleanerService.largeFiles.length === 0
-                        width: parent.width
-                        height: 80
-                        color: "transparent"
-                        StyledText {
-                            anchors.centerIn: parent
-                            text: CleanerService.running ? "Scanning..." : "No large files found in selected folders."
-                            color: Theme.surfaceVariantText
-                            font.pixelSize: Theme.fontSizeSmall
-                        }
-                    }
                 }
             }
         }
@@ -316,36 +185,78 @@ Column {
     Item {
         visible: tabBar.currentIndex === 2
         width: parent.width
-        height: parent.height - tabBar.height - Theme.spacingM * 2
+        height: parent.height - tabBar.height - Theme.spacingS * 2
 
         Column {
             anchors.fill: parent
-            anchors.margins: Theme.spacingM
+            anchors.margins: Theme.spacingS
             spacing: Theme.spacingS
 
-            Row {
+            Rectangle {
+                id: diskHeaderRect
                 width: parent.width
-                spacing: Theme.spacingM
+                height: diskHeaderColumn.implicitHeight + Theme.spacingS * 2
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
 
-                StyledText {
-                    text: "Disk usage: " + CleanerService.formatBytes(CleanerService.diskTotalBytes)
-                    font.pixelSize: Theme.fontSizeMedium
-                    font.weight: Font.DemiBold
-                    color: Theme.surfaceText
-                }
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingS
+                    spacing: Theme.spacingS
 
-                DankButton {
-                    text: "Analyze"
-                    iconName: "refresh"
-                    enabled: !CleanerService.running
-                    onClicked: CleanerService.scanDiskUsage()
+                    Column {
+                        id: diskHeaderColumn
+                        width: parent.width - diskHeaderButtons.width - Theme.spacingS
+                        spacing: 2
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        StyledText {
+                            width: parent.width
+                            text: CleanerService.diskScopePath
+                                ? ("In: " + (CleanerService.diskScopePath.indexOf(CleanerService.homeDir) === 0
+                                    ? "~" + CleanerService.diskScopePath.substring(CleanerService.homeDir.length)
+                                    : CleanerService.diskScopePath) + " • " + CleanerService.formatBytes(CleanerService.diskTotalBytes))
+                                : ("Home: " + CleanerService.formatBytes(CleanerService.diskHomeTotalBytes)
+                                    + "  •  Paths: " + CleanerService.formatBytes(CleanerService.diskTotalBytes))
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.DemiBold
+                            color: Theme.surfaceText
+                            elide: Text.ElideMiddle
+                        }
+
+                        StyledText {
+                            text: "Last analyzed: " + CleanerService.diskLastAnalyzedLabel()
+                            font.pixelSize: Theme.fontSizeXSmall
+                            color: Theme.surfaceVariantText
+                        }
+                    }
+
+                    Row {
+                        id: diskHeaderButtons
+                        spacing: Theme.spacingXS
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        DankButton {
+                            visible: CleanerService.diskScopeStack.length > 0
+                            text: "Back"
+                            iconName: "arrow_back"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.drillBack()
+                        }
+                        DankButton {
+                            text: "Analyze"
+                            iconName: "refresh"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.scanDiskUsage()
+                        }
+                    }
                 }
             }
 
             Row {
                 width: parent.width
-                height: parent.height - 40
-                spacing: Theme.spacingM
+                height: parent.height - diskHeaderRect.height - Theme.spacingS
+                spacing: Theme.spacingS
 
                 Rectangle {
                     width: parent.width * 0.62
@@ -355,7 +266,7 @@ Column {
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: Theme.spacingM
+                        anchors.margins: Theme.spacingS
                         spacing: Theme.spacingXS
 
                         StyledText {
@@ -378,40 +289,51 @@ Column {
                                 Repeater {
                                     model: CleanerService.diskTopDirs
 
-                                    Column {
+                                    Item {
                                         required property var modelData
                                         width: diskBars.width
-                                        spacing: 2
+                                        height: diskRowCol.implicitHeight
 
-                                        StyledText {
-                                            width: parent.width
-                                            text: modelData.path
-                                            elide: Text.ElideMiddle
-                                            font.pixelSize: Theme.fontSizeXSmall
-                                            color: Theme.surfaceVariantText
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: CleanerService.drillIntoPath(modelData.path)
                                         }
 
-                                        Rectangle {
+                                        Column {
+                                            id: diskRowCol
                                             width: parent.width
-                                            height: 10
-                                            radius: 5
-                                            color: Theme.surfaceVariant
+                                            spacing: 2
+
+                                            StyledText {
+                                                width: parent.width
+                                                text: modelData.path
+                                                elide: Text.ElideMiddle
+                                                font.pixelSize: Theme.fontSizeXSmall
+                                                color: Theme.surfaceVariantText
+                                            }
 
                                             Rectangle {
-                                                width: Math.max(
-                                                    2,
-                                                    parent.width * (modelData.size / root.maxDiskRowSize())
-                                                )
-                                                height: parent.height
-                                                radius: parent.radius
-                                                color: Theme.primary
-                                            }
-                                        }
+                                                width: parent.width
+                                                height: 10
+                                                radius: 5
+                                                color: Theme.surfaceVariant
 
-                                        StyledText {
-                                            text: CleanerService.formatBytes(modelData.size)
-                                            font.pixelSize: Theme.fontSizeXSmall
-                                            color: Theme.surfaceText
+                                                Rectangle {
+                                                    width: Math.max(
+                                                        2,
+                                                        parent.width * (modelData.size / root.maxDiskRowSize())
+                                                    )
+                                                    height: parent.height
+                                                    radius: parent.radius
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            StyledText {
+                                                text: CleanerService.formatBytes(modelData.size)
+                                                font.pixelSize: Theme.fontSizeXSmall
+                                                color: Theme.surfaceText
+                                            }
                                         }
                                     }
                                 }
@@ -419,7 +341,7 @@ Column {
                                 Rectangle {
                                     visible: CleanerService.diskTopDirs.length === 0
                                     width: parent.width
-                                    height: 80
+                                    height: 56
                                     color: "transparent"
                                     StyledText {
                                         anchors.centerIn: parent
@@ -434,14 +356,14 @@ Column {
                 }
 
                 Rectangle {
-                    width: parent.width * 0.38 - Theme.spacingM
+                    width: parent.width * 0.38 - Theme.spacingS
                     height: parent.height
                     radius: Theme.cornerRadius
                     color: Theme.surfaceContainerHigh
 
                     Column {
                         anchors.fill: parent
-                        anchors.margins: Theme.spacingM
+                        anchors.margins: Theme.spacingS
                         spacing: Theme.spacingS
 
                         StyledText {
@@ -452,7 +374,7 @@ Column {
 
                         Canvas {
                             id: pieCanvas
-                            width: Math.min(parent.width, 180)
+                            width: Math.min(parent.width, 140)
                             height: width
                             anchors.horizontalCenter: parent.horizontalCenter
 
@@ -533,6 +455,215 @@ Column {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        visible: tabBar.currentIndex === 1
+        width: parent.width
+        height: parent.height - tabBar.height - Theme.spacingS * 2
+
+        Connections {
+            target: tabBar
+            function onCurrentIndexChanged() {
+                if (tabBar.currentIndex === 1) {
+                    CleanerService.checkDocker(function() {
+                        CleanerService.refreshDocker(function() {});
+                    });
+                }
+            }
+        }
+        Component.onCompleted: {
+            if (tabBar.currentIndex === 1) {
+                CleanerService.checkDocker(function() {
+                    CleanerService.refreshDocker(function() {});
+                });
+            }
+        }
+
+        Column {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            spacing: Theme.spacingS
+
+            Rectangle {
+                width: parent.width
+                height: 52
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
+
+                Row {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingS
+                    spacing: Theme.spacingS
+
+                    Column {
+                        width: parent.width - dockerRefreshBtn.width - Theme.spacingS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 4
+
+                        StyledText {
+                            text: CleanerService.dockerAvailable
+                                  ? ("Docker storage: " + CleanerService.dockerTotalSize + " • Reclaimable: " + CleanerService.dockerReclaimable)
+                                  : "Docker not detected. Install Docker or ensure it's in PATH."
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.DemiBold
+                            color: Theme.surfaceText
+                            width: parent.width
+                            elide: Text.ElideRight
+                        }
+
+                        StyledText {
+                            visible: CleanerService.dockerAvailable
+                            text: CleanerService.statusText + " • Tap Refresh to scan"
+                            font.pixelSize: Theme.fontSizeXSmall
+                            color: Theme.surfaceVariantText
+                            width: parent.width
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    DankButton {
+                        id: dockerRefreshBtn
+                        text: "Refresh"
+                        iconName: "refresh"
+                        enabled: !CleanerService.running
+                        anchors.verticalCenter: parent.verticalCenter
+                        onClicked: {
+                            CleanerService.checkDocker(function() {
+                                CleanerService.refreshDocker(function() {});
+                            });
+                        }
+                    }
+                }
+            }
+
+            Item {
+                visible: !CleanerService.dockerAvailable
+                width: parent.width
+                height: 40
+                StyledText {
+                    anchors.centerIn: parent
+                    text: "Start Docker daemon or install Docker to use this tab."
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                }
+            }
+
+            Flickable {
+                visible: CleanerService.dockerAvailable
+                width: parent.width
+                height: parent.height - 60
+                clip: true
+                contentHeight: dockerColumn.implicitHeight
+
+                Column {
+                    id: dockerColumn
+                    width: parent.width
+                    spacing: Theme.spacingS
+
+                    Repeater {
+                        model: CleanerService.dockerBreakdown
+
+                        Rectangle {
+                            required property var modelData
+                            width: dockerColumn.width
+                            height: 36
+                            radius: 4
+                            color: Qt.rgba(Theme.surfaceVariant.r, Theme.surfaceVariant.g, Theme.surfaceVariant.b, 0.3)
+
+                            Row {
+                                anchors.fill: parent
+                                anchors.leftMargin: Theme.spacingS
+                                anchors.rightMargin: Theme.spacingS
+                                spacing: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                StyledText {
+                                    text: modelData.type
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceText
+                                    width: 100
+                                }
+                                StyledText {
+                                    text: modelData.size
+                                    font.pixelSize: Theme.fontSizeXSmall
+                                    color: Theme.surfaceVariantText
+                                }
+                                StyledText {
+                                    text: modelData.reclaimable
+                                    font.pixelSize: Theme.fontSizeXSmall
+                                    color: Theme.primary
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Theme.surfaceVariant
+                    }
+
+                    StyledText {
+                        text: "Selective cleanup"
+                        font.pixelSize: Theme.fontSizeXSmall
+                        font.weight: Font.Medium
+                        color: Theme.surfaceVariantText
+                    }
+
+                    Flow {
+                        width: parent.width
+                        spacing: Theme.spacingS
+
+                        DankButton {
+                            text: "Containers"
+                            iconName: "stop_circle"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.dockerPruneContainers(function() {})
+                        }
+                        DankButton {
+                            text: "Images"
+                            iconName: "image"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.dockerPruneImages(function() {})
+                        }
+                        DankButton {
+                            text: "Volumes"
+                            iconName: "folder"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.dockerPruneVolumes(function() {})
+                        }
+                        DankButton {
+                            text: "Build cache"
+                            iconName: "build"
+                            enabled: !CleanerService.running
+                            onClicked: CleanerService.dockerPruneBuildCache(function() {})
+                        }
+                    }
+
+                    StyledText {
+                        text: "Full cleanup"
+                        font.pixelSize: Theme.fontSizeXSmall
+                        font.weight: Font.Medium
+                        color: Theme.surfaceVariantText
+                    }
+
+                    DankButton {
+                        text: "System prune"
+                        iconName: "delete_sweep"
+                        enabled: !CleanerService.running
+                        onClicked: CleanerService.dockerSystemPrune(function() {})
+                    }
+
+                    StyledText {
+                        visible: CleanerService.dockerPruneFilter.length > 0
+                        text: "Time filter: " + CleanerService.dockerPruneFilter
+                        font.pixelSize: Theme.fontSizeXSmall
+                        color: Theme.surfaceVariantText
                     }
                 }
             }

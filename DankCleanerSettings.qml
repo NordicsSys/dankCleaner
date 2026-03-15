@@ -153,4 +153,47 @@ PluginSettings {
             }
         }
     }
+
+    StyledRect {
+        width: parent.width
+        height: dockerColumn.implicitHeight + Theme.spacingL * 2
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
+
+        Column {
+            id: dockerColumn
+            anchors.fill: parent
+            anchors.margins: Theme.spacingL
+            spacing: Theme.spacingM
+
+            StyledText {
+                text: "Docker cleanup"
+                font.pixelSize: Theme.fontSizeMedium
+                color: Theme.surfaceText
+                font.weight: Font.Medium
+            }
+
+            ToggleSetting {
+                settingKey: "dockerSystemPruneVolumes"
+                label: "Include volumes in full prune"
+                description: "When using System prune, also remove unused volumes (--volumes)"
+                defaultValue: false
+            }
+
+            ToggleSetting {
+                settingKey: "dockerSystemPruneAll"
+                label: "Remove all unused images in full prune"
+                description: "When using System prune, use -a to remove all unused images, not just dangling"
+                defaultValue: true
+            }
+
+            StringSetting {
+                settingKey: "dockerPruneFilter"
+                label: "Time filter (e.g. 24h, 168h)"
+                description: "Optional: only remove resources older than this (used with container prune and system prune)"
+                placeholder: ""
+                defaultValue: ""
+            }
+        }
+    }
 }
