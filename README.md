@@ -9,6 +9,12 @@ Safe one-click cleaner plugin for DankMaterialShell.
 - **Docker tab:** Detect Docker, show storage usage (`docker system df`), one-click prune: stopped containers, unused images, volumes, build cache; full system prune with optional `-a` / `--volumes` and time filter (e.g. `until=24h`) via settings
 - **Disk analyzer tab:** Home total vs configured paths total, last analyzed time, top-directory bars and category pie chart; drill-down (click a directory to view its contents, Back to go up)
 
+## Screenshots
+
+- **Cleanup:** ![Cleanup](Cleanup.png)
+- **Docker:** ![Docker](Docker.png)
+- **Disk Analyzer:** ![Disk Analyzer](Disk-analyzer.png)
+
 ## Safe Mode Scope
 
 Default cleanup targets:
