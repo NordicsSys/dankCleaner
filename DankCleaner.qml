@@ -6,8 +6,8 @@ import qs.Modules.Plugins
 PluginComponent {
     id: root
 
-    popoutWidth: 860
-    popoutHeight: 580
+    popoutWidth: 640
+    popoutHeight: 440
 
     onPluginDataChanged: {
         CleanerService.cleanupCache = pluginData.cleanupCache !== false;
@@ -19,6 +19,9 @@ PluginComponent {
         CleanerService.largeFilePaths = pluginData.largeFilePaths || "~/Downloads\n~/Videos\n~/Documents";
         CleanerService.diskAnalyzerPaths = pluginData.diskAnalyzerPaths || CleanerService.largeFilePaths;
         CleanerService.excludePatterns = pluginData.excludePatterns || "";
+        CleanerService.dockerPruneFilter = pluginData.dockerPruneFilter || "";
+        CleanerService.dockerSystemPruneVolumes = pluginData.dockerSystemPruneVolumes === true;
+        CleanerService.dockerSystemPruneAll = pluginData.dockerSystemPruneAll === true;
         CleanerService.refreshAll();
     }
 
@@ -26,7 +29,7 @@ PluginComponent {
         PopoutComponent {
             DankCleanerPopout {
                 width: popoutWidth
-                height: popoutHeight - Theme.spacingS * 2
+                height: popoutHeight - Theme.spacingXS * 2
             }
         }
     }
