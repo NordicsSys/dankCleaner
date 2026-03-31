@@ -12,9 +12,7 @@ Singleton {
     property bool cleanupBrowserCache: true
     property bool cleanupTmp: false
     property int tmpAgeDays: 3
-    property int largeFileThresholdMb: 100
-    property string largeFilePaths: "~/Downloads\n~/Videos\n~/Documents"
-    property string excludePatterns: ""
+    property string cacheExcludeNames: ""
     property string diskAnalyzerPaths: "~/Downloads\n~/Documents\n~/Videos\n~/Pictures"
 
     property bool running: false
@@ -28,7 +26,6 @@ Singleton {
     property real browserCacheBytes: 0
     property real tmpBytes: 0
 
-    property var largeFiles: []
     property real lastCleanupBytes: 0
     property string lastCleanupLabel: "0 B"
 
@@ -46,7 +43,6 @@ Singleton {
     property string dockerTotalSize: "0 B"
     property string dockerReclaimable: "0 B"
     property var dockerBreakdown: []  // list of { type, size, reclaimable, reclaimablePct }
-    property bool dockerRefreshPending: false
 
     readonly property string homeDir: Quickshell.env("HOME") || ""
 
@@ -72,6 +68,14 @@ Singleton {
     function run(shellCmd, cb) {
         var p = cmdRunner.createObject(root, { shellCmd: shellCmd, onFinished: cb });
         p.running = true;
+    }
+
+    // find/rm/du/docker often exit non-zero on partial errors; Quickshell may report
+    // that as "Theme worker failed (1)". We only rely on stdout in callbacks here.
+    function runQuietExit(shellCmd, cb) {
+        var body = String(shellCmd).replace(/;+\s*$/, "").trim();
+        var wrapped = (body ? body + "; " : "") + "exit 0";
+        run(wrapped, cb);
     }
 
     function shellQuote(input) {
@@ -110,12 +114,9 @@ Singleton {
     }
 
     function safeHomePath(pathValue) {
+        if (!root.homeDir) return false;
         var p = expandTilde(pathValue);
         return p.length > 1 && p.indexOf(root.homeDir + "/") === 0;
-    }
-
-    function normalizeSearchPaths() {
-        return normalizePaths(root.largeFilePaths, [root.homeDir + "/Downloads", root.homeDir + "/Videos", root.homeDir + "/Documents"]);
     }
 
     function normalizePaths(rawValue, fallbackPaths) {
@@ -130,36 +131,66 @@ Singleton {
         return out;
     }
 
-    function patternToRegex(pattern) {
-        var s = String(pattern).trim();
-        if (!s) return null;
-        var escaped = s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-        escaped = escaped.replace(/\*/g, ".*").replace(/\?/g, ".");
-        try {
-            return new RegExp("^" + escaped + "$");
-        } catch (err) {
-            return null;
+    readonly property string cacheRootPath: root.homeDir ? root.homeDir + "/.cache" : ""
+
+    function parseCacheExcludeNames() {
+        var base = root.cacheRootPath;
+        if (!base)
+            return [];
+        var rawList = String(root.cacheExcludeNames || "").split(/\n|,/);
+        var out = [];
+        for (var i = 0; i < rawList.length; i++) {
+            var token = String(rawList[i]).trim();
+            if (!token)
+                continue;
+            var name = "";
+            var full = expandTilde(token);
+            if (full.indexOf(base + "/") === 0) {
+                var rel = full.substring(base.length + 1);
+                if (!rel)
+                    continue;
+                name = rel.split("/")[0];
+            } else if (token.indexOf("/") === -1 && token.indexOf("..") === -1) {
+                name = token;
+            } else {
+                continue;
+            }
+            if (!/^[a-zA-Z0-9._-]+$/.test(name))
+                continue;
+            if (out.indexOf(name) === -1)
+                out.push(name);
         }
+        return out;
     }
 
-    function parseExclusionRegexes() {
-        var rows = String(root.excludePatterns || "").split(/\n|,/);
-        var rules = [];
-        for (var i = 0; i < rows.length; i++) {
-            var row = rows[i].trim();
-            if (!row) continue;
-            var full = row.indexOf("~/") === 0 || row === "~" ? expandTilde(row) : row;
-            var rx = patternToRegex(full);
-            if (rx) rules.push(rx);
+    function cacheCleanPruneNames() {
+        var names = ["mozilla", "google-chrome", "chromium"];
+        var user = parseCacheExcludeNames();
+        for (var j = 0; j < user.length; j++) {
+            if (names.indexOf(user[j]) === -1)
+                names.push(user[j]);
         }
-        return rules;
+        return names;
     }
 
-    function isExcluded(pathValue, regexes) {
-        for (var i = 0; i < regexes.length; i++) {
-            if (regexes[i].test(pathValue)) return true;
+    function buildCacheFindNegations() {
+        var names = cacheCleanPruneNames();
+        var parts = [];
+        for (var i = 0; i < names.length; i++) {
+            parts.push("! -name " + shellQuote(names[i]));
         }
-        return false;
+        return parts.join(" ");
+    }
+
+    function shellCmdCacheSizeEstimate() {
+        var names = cacheCleanPruneNames();
+        var loop = "s=0; ";
+        for (var i = 0; i < names.length; i++) {
+            var n = names[i];
+            loop += "d=$(du -sb \"$HOME/.cache/" + n + "\" 2>/dev/null | awk '{print $1}'); ";
+            loop += "s=$((s+${d:-0})); ";
+        }
+        return "t=$(du -sb \"$HOME/.cache\" 2>/dev/null | awk '{print $1}'); " + loop + "echo $((t-s))";
     }
 
     function refreshAll() {
@@ -170,17 +201,9 @@ Singleton {
         running = true;
         statusText = "Scanning cleanup categories";
         estimateCleanup(function() {
-            statusText = "Scanning large files";
-            scanLargeFiles(function() {
-                statusText = "Analyzing disk usage";
-                scanDiskUsage(function() {
-                    running = false;
-                    statusText = "Ready";
-                    if (refreshPending) {
-                        refreshPending = false;
-                        Qt.callLater(refreshAll);
-                    }
-                });
+            statusText = "Analyzing disk usage";
+            scanDiskUsage(function() {
+                finishRunning("Ready");
             });
         });
     }
@@ -203,8 +226,8 @@ Singleton {
                 next();
                 return;
             }
-            run("du -sb \"$HOME/.cache\" 2>/dev/null | awk '{print $1}'", function(out) {
-                cacheBytes = parseNumber(out);
+            runQuietExit(shellCmdCacheSizeEstimate(), function(out) {
+                cacheBytes = Math.max(0, parseNumber(out));
                 next();
             });
         });
@@ -216,7 +239,7 @@ Singleton {
                 return;
             }
             var cmd = "du -sb \"$HOME/.local/share/Trash/files\" \"$HOME/.local/share/Trash/info\" 2>/dev/null | awk '{sum+=$1} END{print sum+0}'";
-            run(cmd, function(out) {
+            runQuietExit(cmd, function(out) {
                 trashBytes = parseNumber(out);
                 next();
             });
@@ -229,7 +252,7 @@ Singleton {
                 return;
             }
             var cmd = "du -sb \"$HOME/.cache/mozilla\" \"$HOME/.cache/google-chrome\" \"$HOME/.cache/chromium\" 2>/dev/null | awk '{sum+=$1} END{print sum+0}'";
-            run(cmd, function(out) {
+            runQuietExit(cmd, function(out) {
                 browserCacheBytes = parseNumber(out);
                 next();
             });
@@ -243,7 +266,7 @@ Singleton {
             }
             var age = Math.max(1, parseInt(tmpAgeDays) || 3);
             var cmd = "find /tmp -maxdepth 1 -user \"$USER\" -mtime +" + age + " -print0 2>/dev/null | du --files0-from=- -cb 2>/dev/null | tail -n 1 | awk '{print $1+0}'";
-            run(cmd, function(out) {
+            runQuietExit(cmd, function(out) {
                 tmpBytes = parseNumber(out);
                 next();
             });
@@ -259,7 +282,8 @@ Singleton {
         var i = 0;
         function next() {
             if (i >= steps.length) {
-                if (onDone) onDone();
+                if (onDone)
+                    onDone();
                 return;
             }
             var step = steps[i++];
@@ -268,48 +292,13 @@ Singleton {
         next();
     }
 
-    function scanLargeFiles(done) {
-        var threshold = Math.max(1, parseInt(root.largeFileThresholdMb) || 100);
-        var paths = normalizeSearchPaths();
-        var exclusionRegexes = parseExclusionRegexes();
-        var aggregated = [];
-        var steps = [];
-
-        for (var i = 0; i < paths.length; i++) {
-            (function(searchPath) {
-                steps.push(function(next) {
-                    if (!safeHomePath(searchPath)) {
-                        next();
-                        return;
-                    }
-                    var cmd = "find " + shellQuote(searchPath) + " -type f -size +" + threshold + "M -printf '%s|%T@|%p\\n' 2>/dev/null";
-                    run(cmd, function(out) {
-                        var lines = String(out).split("\n");
-                        for (var j = 0; j < lines.length; j++) {
-                            var line = lines[j].trim();
-                            if (!line) continue;
-                            var parts = line.split("|");
-                            if (parts.length < 3) continue;
-                            var filePath = parts.slice(2).join("|");
-                            if (!safeHomePath(filePath)) continue;
-                            if (isExcluded(filePath, exclusionRegexes)) continue;
-                            aggregated.push({
-                                size: parseNumber(parts[0]),
-                                mtime: parseFloat(parts[1]) || 0,
-                                path: filePath
-                            });
-                        }
-                        next();
-                    });
-                });
-            })(paths[i]);
+    function finishRunning(nextStatus) {
+        running = false;
+        statusText = nextStatus;
+        if (refreshPending) {
+            refreshPending = false;
+            Qt.callLater(refreshAll);
         }
-
-        runSequence(steps, function() {
-            aggregated.sort(function(a, b) { return b.size - a.size; });
-            largeFiles = aggregated.slice(0, 300);
-            if (done) done();
-        });
     }
 
     function diskLastAnalyzedLabel() {
@@ -328,7 +317,7 @@ Singleton {
             if (done) done();
             return;
         }
-        run("du -sb " + shellQuote(root.homeDir) + " 2>/dev/null | awk '{print $1}'", function(out) {
+        runQuietExit("du -sb " + shellQuote(root.homeDir) + " 2>/dev/null | awk '{print $1}'", function(out) {
             diskHomeTotalBytes = parseNumber(out);
             if (done) done();
         });
@@ -376,7 +365,7 @@ Singleton {
                         return;
                     }
                     var cmd = "find " + shellQuote(searchPath) + " -mindepth 1 -maxdepth 1 -print0 2>/dev/null | du --files0-from=- -sb 2>/dev/null";
-                    run(cmd, function(out) {
+                    runQuietExit(cmd, function(out) {
                         var lines = String(out).split("\n");
                         var hasRows = false;
                         for (var j = 0; j < lines.length; j++) {
@@ -398,7 +387,7 @@ Singleton {
                         }
 
                         if (!hasRows) {
-                            run("du -sb " + shellQuote(searchPath) + " 2>/dev/null | awk '{print $1\"\\t\"$2}'", function(singleOut) {
+                            runQuietExit("du -sb " + shellQuote(searchPath) + " 2>/dev/null | awk '{print $1\"\\t\"$2}'", function(singleOut) {
                                 var singleParts = String(singleOut).trim().split(/\t+/);
                                 if (singleParts.length >= 2) {
                                     var onePath = singleParts.slice(1).join("\t");
@@ -447,7 +436,7 @@ Singleton {
             return;
         }
         var cmd = "find " + shellQuote(pathValue) + " -mindepth 1 -maxdepth 1 -print0 2>/dev/null | du --files0-from=- -sb 2>/dev/null";
-        run(cmd, function(out) {
+        runQuietExit(cmd, function(out) {
             var rows = [];
             var bucketMap = {};
             var lines = String(out).split("\n");
@@ -470,7 +459,7 @@ Singleton {
                 bucketMap[key] = (bucketMap[key] || 0) + itemSize;
             }
             if (!hasRows) {
-                run("du -sb " + shellQuote(pathValue) + " 2>/dev/null | awk '{print $1\"\\t\"$2}'", function(singleOut) {
+                runQuietExit("du -sb " + shellQuote(pathValue) + " 2>/dev/null | awk '{print $1\"\\t\"$2}'", function(singleOut) {
                     var singleParts = String(singleOut).trim().split(/\t+/);
                     if (singleParts.length >= 2) {
                         var oneSize = parseNumber(singleParts[0]);
@@ -515,8 +504,7 @@ Singleton {
         running = true;
         statusText = "Scanning folder";
         scanDiskUsageAtPath(pathValue, function() {
-            running = false;
-            statusText = "Idle";
+            finishRunning("Idle");
         });
     }
 
@@ -530,13 +518,11 @@ Singleton {
         statusText = "Loading";
         if (parent === "") {
             scanDiskUsage(function() {
-                running = false;
-                statusText = "Idle";
+                finishRunning("Idle");
             });
         } else {
             scanDiskUsageAtPath(parent, function() {
-                running = false;
-                statusText = "Idle";
+                finishRunning("Idle");
             });
         }
     }
@@ -551,22 +537,23 @@ Singleton {
         if (cleanupCache) {
             steps.push(function(next) {
                 // Keep browser caches separate under cleanupBrowserCache toggle.
-                var cmd = "if [ -d \"$HOME/.cache\" ]; then find \"$HOME/.cache\" -mindepth 1 -maxdepth 1 ! -name 'mozilla' ! -name 'google-chrome' ! -name 'chromium' -exec rm -rf -- {} + 2>/dev/null; fi";
-                run(cmd, function() { next(); });
+                var neg = buildCacheFindNegations();
+                var cmd = "if [ -d \"$HOME/.cache\" ]; then find \"$HOME/.cache\" -mindepth 1 -maxdepth 1 " + neg + " -exec rm -rf -- {} + 2>/dev/null; fi";
+                runQuietExit(cmd, function() { next(); });
             });
         }
 
         if (cleanupTrash) {
             steps.push(function(next) {
                 var cmd = "rm -rf \"$HOME/.local/share/Trash/files\"/* \"$HOME/.local/share/Trash/info\"/* 2>/dev/null || true";
-                run(cmd, function() { next(); });
+                runQuietExit(cmd, function() { next(); });
             });
         }
 
         if (cleanupBrowserCache) {
             steps.push(function(next) {
                 var cmd = "rm -rf \"$HOME/.cache/mozilla\" \"$HOME/.cache/google-chrome\" \"$HOME/.cache/chromium\" 2>/dev/null || true";
-                run(cmd, function() { next(); });
+                runQuietExit(cmd, function() { next(); });
             });
         }
 
@@ -574,48 +561,38 @@ Singleton {
             steps.push(function(next) {
                 var age = Math.max(1, parseInt(tmpAgeDays) || 3);
                 var cmd = "find /tmp -maxdepth 1 -user \"$USER\" -mtime +" + age + " -exec rm -rf -- {} + 2>/dev/null || true";
-                run(cmd, function() { next(); });
+                runQuietExit(cmd, function() { next(); });
             });
         }
 
         runSequence(steps, function() {
-            // Only refresh cleanup totals after "Clean Now". Skip scanLargeFiles and
-            // scanDiskUsage here to avoid flooding the shell theme worker (causes
-            // "Theme worker failed"). User can refresh other tabs manually.
+            // Only refresh cleanup totals after "Clean Now". Skip scanDiskUsage here
+            // to avoid flooding the shell theme worker. User can refresh disk tab manually.
             Qt.callLater(function() {
                 estimateCleanup(function() {
                     var reclaimed = Math.max(0, before - totalCleanupBytes);
                     lastCleanupBytes = reclaimed;
                     lastCleanupLabel = formatBytes(reclaimed);
-                    running = false;
-                    statusText = "Cleanup completed";
+                    finishRunning("Cleanup completed");
                 });
             });
-        });
-    }
-
-    function removeLargeFile(pathValue) {
-        if (!safeHomePath(pathValue)) return;
-        if (running) return;
-        running = true;
-        statusText = "Deleting selected file";
-        var cmd = "rm -f -- " + shellQuote(pathValue) + " 2>/dev/null";
-        run(cmd, function() {
-            refreshAll();
         });
     }
 
     // ---- Docker ----
     property string dockerPruneFilter: ""       // e.g. "24h" for --filter "until=24h"
     property bool dockerSystemPruneVolumes: false
-    property bool dockerSystemPruneAll: false
+    property bool dockerSystemPruneAll: true
 
     function parseDockerSize(str) {
         if (!str || typeof str !== "string") return 0;
         var s = str.replace(/\s*\([^)]*\)\s*$/, "").trim();  // strip " (65%)"
+        s = s.replace(/(\d+(?:[.,]\d+)?)\s*([KMGTP])iB/gi, function(_, num, pfx) {
+            return String(num).replace(",", ".") + " " + pfx.toUpperCase() + "B";
+        });
         var m = s.match(/^([\d.]+)\s*([KMGTP]?B)$/i);
         if (!m) return 0;
-        var n = parseFloat(m[1]);
+        var n = parseFloat(String(m[1]).replace(",", "."));
         if (isNaN(n)) return 0;
         var u = (m[2] || "B").toUpperCase();
         if (u === "B") return n;
@@ -627,7 +604,7 @@ Singleton {
     }
 
     function checkDocker(done) {
-        run("command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && echo ok", function(out) {
+        runQuietExit("command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && echo ok", function(out) {
             dockerAvailable = (String(out).trim() === "ok");
             if (done) done();
         });
@@ -639,7 +616,7 @@ Singleton {
             return;
         }
         // docker system df: table with TYPE, TOTAL, ACTIVE, SIZE, RECLAIMABLE
-        run("docker system df 2>/dev/null", function(out) {
+        runQuietExit("docker system df 2>/dev/null", function(out) {
             var lines = String(out).trim().split("\n");
             var breakdown = [];
             var totalBytes = 0;
@@ -683,11 +660,10 @@ Singleton {
         running = true;
         statusText = "Pruning Docker containers";
         var cmd = "docker container prune -f" + dockerPruneFilterArgs() + " 2>/dev/null";
-        run(cmd, function() {
+        runQuietExit(cmd, function() {
             Qt.callLater(function() {
                 refreshDocker(function() {
-                    running = false;
-                    statusText = "Idle";
+                    finishRunning("Idle");
                     if (done) done();
                 });
             });
@@ -699,11 +675,10 @@ Singleton {
         running = true;
         statusText = "Pruning Docker images";
         var cmd = "docker image prune -af 2>/dev/null";  // -a = all unused, -f = force
-        run(cmd, function() {
+        runQuietExit(cmd, function() {
             Qt.callLater(function() {
                 refreshDocker(function() {
-                    running = false;
-                    statusText = "Idle";
+                    finishRunning("Idle");
                     if (done) done();
                 });
             });
@@ -715,11 +690,10 @@ Singleton {
         running = true;
         statusText = "Pruning Docker volumes";
         var cmd = "docker volume prune -f 2>/dev/null";
-        run(cmd, function() {
+        runQuietExit(cmd, function() {
             Qt.callLater(function() {
                 refreshDocker(function() {
-                    running = false;
-                    statusText = "Idle";
+                    finishRunning("Idle");
                     if (done) done();
                 });
             });
@@ -731,11 +705,10 @@ Singleton {
         running = true;
         statusText = "Pruning Docker build cache";
         var cmd = "docker builder prune -af 2>/dev/null";
-        run(cmd, function() {
+        runQuietExit(cmd, function() {
             Qt.callLater(function() {
                 refreshDocker(function() {
-                    running = false;
-                    statusText = "Idle";
+                    finishRunning("Idle");
                     if (done) done();
                 });
             });
@@ -750,11 +723,10 @@ Singleton {
         if (dockerSystemPruneAll) cmd += " -a";
         if (dockerSystemPruneVolumes) cmd += " --volumes";
         cmd += dockerPruneFilterArgs() + " 2>/dev/null";
-        run(cmd, function() {
+        runQuietExit(cmd, function() {
             Qt.callLater(function() {
                 refreshDocker(function() {
-                    running = false;
-                    statusText = "Idle";
+                    finishRunning("Idle");
                     if (done) done();
                 });
             });

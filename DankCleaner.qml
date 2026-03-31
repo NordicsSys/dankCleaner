@@ -9,20 +9,43 @@ PluginComponent {
     popoutWidth: 640
     popoutHeight: 440
 
+    property string _settingsSignature: ""
+
+    function _settingsSignatureFrom(data) {
+        if (!data) return "";
+        return [
+            data.cleanupCache !== false,
+            data.cleanupTrash !== false,
+            data.cleanupBrowserCache !== false,
+            data.cleanupTmp === true,
+            String(parseInt(data.tmpAgeDays, 10) || 3),
+            String(data.diskAnalyzerPaths || ""),
+            String(data.cacheExcludeNames || ""),
+            String(data.dockerPruneFilter || ""),
+            data.dockerSystemPruneVolumes === true,
+            data.dockerSystemPruneAll !== false
+        ].join("\x1e");
+    }
+
     onPluginDataChanged: {
+        if (!pluginData) return;
+        var nextSig = _settingsSignatureFrom(pluginData);
         CleanerService.cleanupCache = pluginData.cleanupCache !== false;
         CleanerService.cleanupTrash = pluginData.cleanupTrash !== false;
         CleanerService.cleanupBrowserCache = pluginData.cleanupBrowserCache !== false;
         CleanerService.cleanupTmp = pluginData.cleanupTmp === true;
-        CleanerService.tmpAgeDays = parseInt(pluginData.tmpAgeDays) || 3;
-        CleanerService.largeFileThresholdMb = parseInt(pluginData.largeFileThresholdMb) || 100;
-        CleanerService.largeFilePaths = pluginData.largeFilePaths || "~/Downloads\n~/Videos\n~/Documents";
-        CleanerService.diskAnalyzerPaths = pluginData.diskAnalyzerPaths || CleanerService.largeFilePaths;
-        CleanerService.excludePatterns = pluginData.excludePatterns || "";
+        CleanerService.tmpAgeDays = parseInt(pluginData.tmpAgeDays, 10) || 3;
+        CleanerService.diskAnalyzerPaths = pluginData.diskAnalyzerPaths || "~/Downloads\n~/Documents\n~/Videos\n~/Pictures";
+        CleanerService.cacheExcludeNames = pluginData.cacheExcludeNames || "";
         CleanerService.dockerPruneFilter = pluginData.dockerPruneFilter || "";
         CleanerService.dockerSystemPruneVolumes = pluginData.dockerSystemPruneVolumes === true;
-        CleanerService.dockerSystemPruneAll = pluginData.dockerSystemPruneAll === true;
-        CleanerService.refreshAll();
+        CleanerService.dockerSystemPruneAll = pluginData.dockerSystemPruneAll !== false;
+        if (nextSig === _settingsSignature)
+            return;
+        _settingsSignature = nextSig;
+        Qt.callLater(function() {
+            CleanerService.refreshAll();
+        });
     }
 
     popoutContent: Component {

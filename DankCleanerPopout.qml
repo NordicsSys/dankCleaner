@@ -63,7 +63,7 @@ Column {
                     Column {
                         width: parent.width - cleanButton.width - Theme.spacingS
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 4
+                        spacing: Theme.spacingXS
 
                         StyledText {
                             text: "Reclaimable space: " + CleanerService.formatBytes(CleanerService.totalCleanupBytes)
@@ -164,6 +164,7 @@ Column {
                 spacing: Theme.spacingS
 
                 DankButton {
+                    id: rescanButton
                     text: "Rescan"
                     iconName: "refresh"
                     enabled: !CleanerService.running
@@ -175,7 +176,7 @@ Column {
                     text: "Safe mode: only user-space cache/temp/trash paths are touched."
                     font.pixelSize: Theme.fontSizeXSmall
                     color: Theme.surfaceVariantText
-                    width: parent.width - 120
+                    width: Math.max(0, parent.width - rescanButton.width - Theme.spacingS)
                     elide: Text.ElideRight
                 }
             }
@@ -207,7 +208,7 @@ Column {
                     Column {
                         id: diskHeaderColumn
                         width: parent.width - diskHeaderButtons.width - Theme.spacingS
-                        spacing: 2
+                        spacing: Theme.spacingXS
                         anchors.verticalCenter: parent.verticalCenter
 
                         StyledText {
@@ -247,7 +248,14 @@ Column {
                             text: "Analyze"
                             iconName: "refresh"
                             enabled: !CleanerService.running
-                            onClicked: CleanerService.scanDiskUsage()
+                            onClicked: {
+                                if (CleanerService.running) return;
+                                CleanerService.running = true;
+                                CleanerService.statusText = "Analyzing disk usage";
+                                CleanerService.scanDiskUsage(function() {
+                                    CleanerService.finishRunning("Ready");
+                                });
+                            }
                         }
                     }
                 }
@@ -270,6 +278,7 @@ Column {
                         spacing: Theme.spacingXS
 
                         StyledText {
+                            id: diskListSectionLabel
                             text: "Top directories"
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
@@ -277,7 +286,7 @@ Column {
 
                         Flickable {
                             width: parent.width
-                            height: parent.height - 24
+                            height: Math.max(Theme.spacingM, parent.height - diskListSectionLabel.implicitHeight - Theme.spacingXS)
                             contentHeight: diskBars.implicitHeight
                             clip: true
 
@@ -302,7 +311,7 @@ Column {
                                         Column {
                                             id: diskRowCol
                                             width: parent.width
-                                            spacing: 2
+                                            spacing: Theme.spacingXS
 
                                             StyledText {
                                                 width: parent.width
@@ -341,10 +350,14 @@ Column {
                                 Rectangle {
                                     visible: CleanerService.diskTopDirs.length === 0
                                     width: parent.width
-                                    height: 56
+                                    implicitHeight: diskEmptyHint.implicitHeight + Theme.spacingM * 2
+                                    height: implicitHeight
                                     color: "transparent"
                                     StyledText {
+                                        id: diskEmptyHint
                                         anchors.centerIn: parent
+                                        width: parent.width
+                                        horizontalAlignment: Text.AlignHCenter
                                         text: CleanerService.running ? "Analyzing..." : "No disk data available."
                                         color: Theme.surfaceVariantText
                                         font.pixelSize: Theme.fontSizeSmall
@@ -367,6 +380,7 @@ Column {
                         spacing: Theme.spacingS
 
                         StyledText {
+                            id: pieSectionLabel
                             text: "Category split"
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
@@ -419,7 +433,10 @@ Column {
 
                         Flickable {
                             width: parent.width
-                            height: parent.height - pieCanvas.height - 56
+                            height: Math.max(
+                                Theme.spacingM,
+                                parent.height - pieSectionLabel.implicitHeight - Theme.spacingS
+                                    - pieCanvas.height - Theme.spacingS)
                             contentHeight: legendColumn.implicitHeight
                             clip: true
 
@@ -490,8 +507,10 @@ Column {
             spacing: Theme.spacingS
 
             Rectangle {
+                id: dockerHeaderCard
                 width: parent.width
-                height: 52
+                implicitHeight: 52
+                height: implicitHeight
                 radius: Theme.cornerRadius
                 color: Theme.surfaceContainerHigh
 
@@ -503,7 +522,7 @@ Column {
                     Column {
                         width: parent.width - dockerRefreshBtn.width - Theme.spacingS
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 4
+                        spacing: Theme.spacingXS
 
                         StyledText {
                             text: CleanerService.dockerAvailable
@@ -542,9 +561,10 @@ Column {
             }
 
             Item {
+                id: dockerUnavailableBanner
                 visible: !CleanerService.dockerAvailable
                 width: parent.width
-                height: 40
+                height: visible ? 40 : 0
                 StyledText {
                     anchors.centerIn: parent
                     text: "Start Docker daemon or install Docker to use this tab."
@@ -556,7 +576,10 @@ Column {
             Flickable {
                 visible: CleanerService.dockerAvailable
                 width: parent.width
-                height: parent.height - 60
+                height: Math.max(
+                    Theme.spacingM,
+                    parent.height - dockerHeaderCard.height - Theme.spacingS
+                        - (dockerUnavailableBanner.visible ? dockerUnavailableBanner.height + Theme.spacingS : 0))
                 clip: true
                 contentHeight: dockerColumn.implicitHeight
 
@@ -576,11 +599,12 @@ Column {
                             color: Qt.rgba(Theme.surfaceVariant.r, Theme.surfaceVariant.g, Theme.surfaceVariant.b, 0.3)
 
                             Row {
-                                anchors.fill: parent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
                                 anchors.leftMargin: Theme.spacingS
                                 anchors.rightMargin: Theme.spacingS
-                                spacing: Theme.spacingS
                                 anchors.verticalCenter: parent.verticalCenter
+                                spacing: Theme.spacingS
 
                                 StyledText {
                                     text: modelData.type

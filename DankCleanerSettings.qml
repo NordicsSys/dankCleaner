@@ -49,6 +49,14 @@ PluginSettings {
                 defaultValue: true
             }
 
+            StringSetting {
+                settingKey: "cacheExcludeNames"
+                label: "Never remove under ~/.cache (names)"
+                description: "Top-level names kept when cleaning cache (comma or newline). Example: yay keeps ~/.cache/yay including vcs.json"
+                placeholder: "yay"
+                defaultValue: ""
+            }
+
             ToggleSetting {
                 settingKey: "cleanupTrash"
                 label: "Clean Trash"
@@ -82,51 +90,6 @@ PluginSettings {
 
     StyledRect {
         width: parent.width
-        height: largeFilesColumn.implicitHeight + Theme.spacingL * 2
-        radius: Theme.cornerRadius
-        color: Theme.surfaceContainerHigh
-
-        Column {
-            id: largeFilesColumn
-            anchors.fill: parent
-            anchors.margins: Theme.spacingL
-            spacing: Theme.spacingM
-
-            StyledText {
-                text: "Large File Scanner"
-                font.pixelSize: Theme.fontSizeMedium
-                color: Theme.surfaceText
-                font.weight: Font.Medium
-            }
-
-            StringSetting {
-                settingKey: "largeFileThresholdMb"
-                label: "Large file threshold (MB)"
-                description: "Only files bigger than this size are shown"
-                placeholder: "100"
-                defaultValue: "100"
-            }
-
-            StringSetting {
-                settingKey: "largeFilePaths"
-                label: "Scan paths (comma or newline separated)"
-                description: "Use home paths only, e.g. ~/Downloads, ~/Videos"
-                placeholder: "~/Downloads,~/Videos,~/Documents"
-                defaultValue: "~/Downloads\n~/Videos\n~/Documents"
-            }
-
-            StringSetting {
-                settingKey: "excludePatterns"
-                label: "Exclude patterns (* and ? supported)"
-                description: "Example: ~/Downloads/keep/*"
-                placeholder: ""
-                defaultValue: ""
-            }
-        }
-    }
-
-    StyledRect {
-        width: parent.width
         height: analysisColumn.implicitHeight + Theme.spacingL * 2
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh
@@ -147,7 +110,7 @@ PluginSettings {
             StringSetting {
                 settingKey: "diskAnalyzerPaths"
                 label: "Disk analyzer paths"
-                description: "Top-level usage chart source paths (home folder only)"
+                description: "Top-level usage chart source paths (home folder only). Prefer non-overlapping roots so the Paths total does not double-count."
                 placeholder: "~/Downloads,~/Documents,~/Videos,~/Pictures"
                 defaultValue: "~/Downloads\n~/Documents\n~/Videos\n~/Pictures"
             }
